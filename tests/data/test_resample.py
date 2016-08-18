@@ -25,6 +25,7 @@ from zipline.data.resample import (
     minute_to_session,
     DailyHistoryAggregator,
     MinuteResampleSessionBarReader,
+    MinuteUpsampleBarReader,
 )
 
 from zipline.testing.fixtures import (
@@ -527,3 +528,31 @@ class TestResampleSessionBars(WithBcolzFutureMinuteBarReader,
                     assert_almost_equal(values[col], result,
                                         err_msg="sid={0} col={1} dt={2}".
                                         format(sid, col, dt))
+
+
+class TestUpsampleMinuteBars(WithBcolzEquityMinuteBarReader,
+                             ZiplineTestCase):
+
+    TRADING_CALENDAR_STRS = ('CME', 'NYSE')
+    TRADING_CALENDAR_PRIMARY_CAL = 'CME'
+
+    ASSET_FINDER_EQUITY_SIDS = 1, 2, 3
+
+    START_DATE = pd.Timestamp('2015-12-01', tz='UTC')
+    END_DATE = pd.Timestamp('2015-12-31', tz='UTC')
+
+    def test_equity_minute_upsample(self):
+        upsample_reader = MinuteUpsampleBarReader(
+            self.trading_calendar,
+            self.bcolz_equity_minute_bar_reader
+        )
+        m_open, m_close = self.trading_calendar.open_and_close_for_session(
+            self.START_DATE)
+        outer_minutes = self.trading_calendar.minutes_in_range(m_open, m_close)
+        result = upsample_reader.load_raw_arrays(
+            OHLCV, m_open, m_close, [1, 2])
+
+        opens = DataFrame(data=result[0], index=outer_minutes).dropna()
+        opens_with_price = opens.dropna()
+
+        self.assertEqual(390, len(opens_with_price))

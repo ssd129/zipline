@@ -12,11 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from collections import OrderedDict
+from types import MethodType
 
 import numpy as np
 import pandas as pd
 from pandas import DataFrame
 
+from zipline.data.minute_bars import MinuteBarReader
 from zipline.data.session_bars import SessionBarReader
 from zipline.utils.memoize import lazyval
 
@@ -498,3 +500,59 @@ class MinuteResampleSessionBarReader(SessionBarReader):
         return self.trading_calendar.minute_to_session_label(
             self._minute_bar_reader.last_available_dt
         )
+
+
+class UpsampleBarReader(object):
+
+    def __init__(self, trading_calendar, reader):
+        self._trading_calendar = trading_calendar
+        self._reader = reader
+
+    @property
+    def last_available_dt(self):
+        return self._reader.last_available_dt
+
+    def get_last_traded_dt(self, sid, dt):
+        return self._reader.get_last_traded_dt(sid, dt)
+
+    @property
+    def first_trading_day(self):
+        return self._reader.first_trading_day
+
+    def get_value(self, sid, dt, field):
+        return self._reader.get_value(sid, dt, field)
+
+
+class MinuteUpsampleBarReader(UpsampleBarReader, MinuteBarReader):
+
+    def load_raw_arrays(self, fields, start_dt, end_dt, sids):
+        outer_minutes = self._trading_calendar.minutes_in_range(start_dt,
+                                                                end_dt)
+        inner_minutes = self._reader.calendar.minutes_in_range(start_dt,
+                                                               end_dt)
+
+        indices = outer_minutes.searchsorted(inner_minutes)
+
+        shape = len(outer_minutes), len(sids)
+
+        outer_results = []
+
+        inner_results = self._reader.load_raw_arrays(
+            fields, inner_minutes[0], inner_minutes[-1], sids)
+
+        for i, field in enumerate(fields):
+            if field != 'volume':
+                out = np.full(shape, np.nan)
+            else:
+                out = np.zeros(shape, dtype=np.uint32)
+
+            out[indices] = inner_results[i]
+
+            outer_results.append(out)
+
+        return outer_results
+
+
+class SessionUpsampleBarReader(UpsampleBarReader, SessionBarReader):
+    def load_raw_arrays(self, fields, start_dt, end_dt, sids):
+        pass

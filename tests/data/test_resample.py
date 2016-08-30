@@ -663,3 +663,9 @@ class TestReindexSessionBars(WithBcolzEquityDailyBarReader,
 
     def test_last_availabe_dt(self):
         self.assertEqual(self.reader.last_available_dt, self.END_DATE)
+
+    def test_get_last_traded_dt(self):
+        asset = self.asset_finder.retrieve_asset(1)
+        self.assertEqual(self.reader.get_last_traded_dt(asset,
+                                                        self.END_DATE),
+                         self.END_DATE)

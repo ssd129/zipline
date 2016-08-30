@@ -631,13 +631,7 @@ class BcolzDailyBarReader(SessionBarReader):
     def get_last_traded_dt(self, asset, day):
         volumes = self._spot_col('volume')
 
-        if day >= asset.end_date:
-            # go back to one day before the asset ended
-            search_day = self.sessions[
-                self.sessions.searchsorted(asset.end_date) - 1
-            ]
-        else:
-            search_day = day
+        search_day = day
 
         while True:
             try:

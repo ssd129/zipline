@@ -153,6 +153,9 @@ cdef class BarData:
     data_frequency : {'minute', 'daily'}
         The frequency of the bar data; i.e. whether the data is
         daily or minute bars
+    rl_controller : callable
+        Object that combines and returns restricted list information from
+        multiple sources
     universe_func : callable, optional
         Function which returns the current 'universe'.  This is for
         backwards compatibility with older API concepts.
@@ -166,11 +169,12 @@ cdef class BarData:
     cdef object _universe_last_updated_at
     cdef bool _daily_mode
     cdef object _trading_calendar
+    cdef object _rl_controller
 
     cdef bool _adjust_minutes
 
     def __init__(self, data_portal, simulation_dt_func, data_frequency,
-                 trading_calendar, universe_func=None):
+                 trading_calendar, rl_controller, universe_func=None):
         self.data_portal = data_portal
         self.simulation_dt_func = simulation_dt_func
         self.data_frequency = data_frequency
@@ -185,6 +189,7 @@ cdef class BarData:
         self._adjust_minutes = False
 
         self._trading_calendar = trading_calendar
+        self._rl_controller = rl_controller
 
     cdef _get_equity_price_view(self, asset):
         """
@@ -481,6 +486,9 @@ cdef class BarData:
     cdef bool _can_trade_for_asset(self, asset, dt, adjusted_dt, data_portal):
         cdef object session_label
         cdef object dt_to_use_for_exchange_check,
+
+        if self._rl_controller.is_restricted(asset, adjusted_dt):
+            return False
 
         session_label = self._trading_calendar.minute_to_session_label(dt)
 

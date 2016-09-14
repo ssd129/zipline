@@ -23,6 +23,8 @@ import pandas as pd
 
 from zipline._protocol import handle_non_market_minutes
 from zipline.protocol import BarData
+from zipline.rl_manager import RestrictionsController, InMemoryRLManager, \
+    Restriction
 from zipline.testing import (
     MockDailyBarReader,
     create_daily_df_for_asset,
@@ -46,6 +48,8 @@ field_info = {
     "low": -1,
     "close": 0
 }
+
+str_to_ts = lambda dt_str: pd.Timestamp(dt_str, tz='UTC')
 
 
 class WithBarDataChecks(object):
@@ -193,6 +197,10 @@ class TestMinuteBarData(WithBarDataChecks,
 
         cls.ASSETS = [cls.ASSET1, cls.ASSET2]
 
+    def init_instance_fixtures(self):
+        super(TestMinuteBarData, self).init_instance_fixtures()
+        self.restrictions_controller = RestrictionsController()
+
     def test_minute_before_assets_trading(self):
         # grab minutes that include the day before the asset start
         minutes = self.trading_calendar.minutes_for_session(
@@ -204,7 +212,8 @@ class TestMinuteBarData(WithBarDataChecks,
         # this entire day is before either asset has started trading
         for idx, minute in enumerate(minutes):
             bar_data = BarData(self.data_portal, lambda: minute, "minute",
-                               self.trading_calendar)
+                               self.trading_calendar,
+                               self.restrictions_controller)
             self.check_internal_consistency(bar_data)
 
             self.assertFalse(bar_data.can_trade(self.ASSET1))
@@ -247,7 +256,8 @@ class TestMinuteBarData(WithBarDataChecks,
             # has data starting on the 10th minute.
 
             bar_data = BarData(self.data_portal, lambda: minute, "minute",
-                               self.trading_calendar)
+                               self.trading_calendar,
+                               self.restrictions_controller)
             self.check_internal_consistency(bar_data)
             asset2_has_data = (((idx + 1) % 10) == 0)
 
@@ -327,7 +337,8 @@ class TestMinuteBarData(WithBarDataChecks,
         # this is the last day the assets exist
         for idx, minute in enumerate(minutes):
             bar_data = BarData(self.data_portal, lambda: minute, "minute",
-                               self.trading_calendar)
+                               self.trading_calendar,
+                               self.restrictions_controller)
 
             self.assertTrue(bar_data.can_trade(self.ASSET1))
             self.assertTrue(bar_data.can_trade(self.ASSET2))
@@ -346,7 +357,8 @@ class TestMinuteBarData(WithBarDataChecks,
         # this entire day is after both assets have stopped trading
         for idx, minute in enumerate(minutes):
             bar_data = BarData(self.data_portal, lambda: minute, "minute",
-                               self.trading_calendar)
+                               self.trading_calendar,
+                               self.restrictions_controller)
 
             self.assertFalse(bar_data.can_trade(self.ASSET1))
             self.assertFalse(bar_data.can_trade(self.ASSET2))
@@ -389,7 +401,8 @@ class TestMinuteBarData(WithBarDataChecks,
 
         for idx, minute in enumerate(minutes):
             bar_data = BarData(self.data_portal, lambda: minute, "minute",
-                               self.trading_calendar)
+                               self.trading_calendar,
+                               self.restrictions_controller)
             self.assertEqual(
                 idx + 1,
                 bar_data.current(self.SPLIT_ASSET, "price")
@@ -407,7 +420,8 @@ class TestMinuteBarData(WithBarDataChecks,
 
         for idx, minute in enumerate(day0_minutes[-10:-1]):
             bar_data = BarData(self.data_portal, lambda: minute, "minute",
-                               self.trading_calendar)
+                               self.trading_calendar,
+                               self.restrictions_controller)
             self.assertEqual(
                 380,
                 bar_data.current(self.ILLIQUID_SPLIT_ASSET, "price")
@@ -415,7 +429,8 @@ class TestMinuteBarData(WithBarDataChecks,
 
         bar_data = BarData(
             self.data_portal, lambda: day0_minutes[-1], "minute",
-            self.trading_calendar
+            self.trading_calendar,
+            self.restrictions_controller
         )
 
         self.assertEqual(
@@ -425,7 +440,8 @@ class TestMinuteBarData(WithBarDataChecks,
 
         for idx, minute in enumerate(day1_minutes[0:9]):
             bar_data = BarData(self.data_portal, lambda: minute, "minute",
-                               self.trading_calendar)
+                               self.trading_calendar,
+                               self.restrictions_controller)
 
             # should be half of 390, due to the split
             self.assertEqual(
@@ -445,11 +461,13 @@ class TestMinuteBarData(WithBarDataChecks,
             )
 
         bar_data = BarData(self.data_portal, lambda: day, "minute",
-                           self.trading_calendar)
+                           self.trading_calendar,
+                           self.restrictions_controller)
         bar_data2 = BarData(self.data_portal,
                             lambda: eight_fortyfive_am_eastern,
                             "minute",
-                            self.trading_calendar)
+                            self.trading_calendar,
+                            self.restrictions_controller)
 
         with handle_non_market_minutes(bar_data), \
                 handle_non_market_minutes(bar_data2):
@@ -497,7 +515,8 @@ class TestMinuteBarData(WithBarDataChecks,
 
         for minute in minutes_to_check:
             bar_data = BarData(
-                self.data_portal, lambda: minute, "minute", cal
+                self.data_portal, lambda: minute, "minute", cal,
+                self.restrictions_controller
             )
 
             self.assertFalse(bar_data.can_trade(self.ASSET1))
@@ -517,7 +536,8 @@ class TestMinuteBarData(WithBarDataChecks,
 
         for minute in minutes_to_check:
             bar_data = BarData(
-                self.data_portal, lambda: minute, "minute", cal
+                self.data_portal, lambda: minute, "minute", cal,
+                self.restrictions_controller
             )
 
             self.assertFalse(bar_data.can_trade(self.ASSET1))
@@ -536,7 +556,8 @@ class TestMinuteBarData(WithBarDataChecks,
 
         for minute in minutes:
             bar_data = BarData(
-                self.data_portal, lambda: minute, "minute", cal
+                self.data_portal, lambda: minute, "minute", cal,
+                self.restrictions_controller
             )
 
             self.assertTrue(bar_data.can_trade(self.ASSET1))
@@ -552,7 +573,8 @@ class TestMinuteBarData(WithBarDataChecks,
 
         for minute in minutes_in_session[0:49]:
             bar_data = BarData(
-                self.data_portal, lambda: minute, "minute", cal
+                self.data_portal, lambda: minute, "minute", cal,
+                self.restrictions_controller
             )
 
             self.assertFalse(bar_data.can_trade(
@@ -561,7 +583,8 @@ class TestMinuteBarData(WithBarDataChecks,
 
         for minute in minutes_in_session[50:]:
             bar_data = BarData(
-                self.data_portal, lambda: minute, "minute", cal
+                self.data_portal, lambda: minute, "minute", cal,
+                self.restrictions_controller
             )
 
             self.assertTrue(bar_data.can_trade(
@@ -610,7 +633,8 @@ class TestMinuteBarData(WithBarDataChecks,
         for info in minutes_to_check:
             # use the CME calendar, which covers 24 hours
             bar_data = BarData(self.data_portal, lambda: info[0], "minute",
-                               trading_calendar=get_calendar("CME"))
+                               get_calendar("CME"),
+                               self.restrictions_controller)
 
             series = bar_data.can_trade([nyse_asset, ice_asset])
 
@@ -622,7 +646,8 @@ class TestMinuteBarData(WithBarDataChecks,
             self.data_portal,
             lambda: self.equity_minute_bar_days[1],
             "minute",
-            self.trading_calendar
+            self.trading_calendar,
+            self.restrictions_controller
         )
 
         with handle_non_market_minutes(bar_data):
@@ -653,7 +678,8 @@ class TestMinuteBarData(WithBarDataChecks,
         bar_data = BarData(self.data_portal,
                            lambda: eight_fortyfive_am_eastern,
                            "minute",
-                           self.trading_calendar)
+                           self.trading_calendar,
+                           self.restrictions_controller)
 
         expected = {
             'open': 391 / 2.0,
@@ -670,6 +696,34 @@ class TestMinuteBarData(WithBarDataChecks,
 
                 # Assert the price is adjusted for the overnight split
                 self.assertEqual(value, expected[field])
+
+    def test_can_trade_restricted(self):
+        """
+        Test that can_trade will return False for a sid if it is restricted
+        on that dt
+        """
+
+        minutes_to_check = [
+            (pd.Timestamp("2016-01-05 9:31", tz="US/Eastern"), False),
+            (pd.Timestamp("2016-01-06 9:31", tz="US/Eastern"), False),
+            (pd.Timestamp("2016-01-07 9:31", tz="US/Eastern"), True),
+        ]
+
+        rlm = InMemoryRLManager([
+            Restriction(1, str_to_ts('2016-01-05'), str_to_ts('2016-01-06'),
+                        'freeze'),
+            Restriction(1, str_to_ts('2016-01-06'), str_to_ts('2016-01-07'),
+                        'liquidate'),
+        ])
+        self.restrictions_controller.add_restrictions(rlm)
+
+        for info in minutes_to_check:
+            bar_data = BarData(self.data_portal,
+                               lambda: info[0],
+                               "minute",
+                               self.trading_calendar,
+                               self.restrictions_controller)
+            self.assertEqual(bar_data.can_trade(self.ASSET1), info[1])
 
 
 class TestDailyBarData(WithBarDataChecks,
@@ -805,6 +859,10 @@ class TestDailyBarData(WithBarDataChecks,
         )
         cls.ASSETS = [cls.ASSET1, cls.ASSET2]
 
+    def init_instance_fixtures(self):
+        super(TestDailyBarData, self).init_instance_fixtures()
+        self.restrictions_controller = RestrictionsController()
+
     def get_last_minute_of_session(self, session_label):
         return self.trading_calendar.open_and_close_for_session(
             session_label
@@ -819,7 +877,8 @@ class TestDailyBarData(WithBarDataChecks,
         )
 
         bar_data = BarData(self.data_portal, lambda: minute, "daily",
-                           self.trading_calendar)
+                           self.trading_calendar,
+                           self.restrictions_controller)
         self.check_internal_consistency(bar_data)
 
         self.assertFalse(bar_data.can_trade(self.ASSET1))
@@ -847,7 +906,8 @@ class TestDailyBarData(WithBarDataChecks,
                 self.equity_daily_bar_days[0]
             ),
             "daily",
-            self.trading_calendar
+            self.trading_calendar,
+            self.restrictions_controller
         )
         self.check_internal_consistency(bar_data)
 
@@ -885,7 +945,8 @@ class TestDailyBarData(WithBarDataChecks,
                 self.equity_daily_bar_days[1]
             ),
             "daily",
-            self.trading_calendar
+            self.trading_calendar,
+            self.restrictions_controller
         )
         self.check_internal_consistency(bar_data)
 
@@ -912,7 +973,8 @@ class TestDailyBarData(WithBarDataChecks,
                 self.equity_daily_bar_days[-1]
             ),
             "daily",
-            self.trading_calendar
+            self.trading_calendar,
+            self.restrictions_controller
         )
         self.check_internal_consistency(bar_data)
 
@@ -942,7 +1004,8 @@ class TestDailyBarData(WithBarDataChecks,
         session = self.END_DATE
 
         bar_data = BarData(self.data_portal, lambda: session, "daily",
-                           self.trading_calendar)
+                           self.trading_calendar,
+                           self.restrictions_controller)
         self.check_internal_consistency(bar_data)
 
         for asset in self.ASSETS:
@@ -996,7 +1059,8 @@ class TestDailyBarData(WithBarDataChecks,
             self.data_portal,
             lambda: self.equity_daily_bar_days[0],
             "daily",
-            self.trading_calendar
+            self.trading_calendar,
+            self.restrictions_controller
         )
         self.assertEqual(
             liquid_day_0_price,
@@ -1006,7 +1070,8 @@ class TestDailyBarData(WithBarDataChecks,
             self.data_portal,
             lambda: self.equity_daily_bar_days[1],
             "daily",
-            self.trading_calendar
+            self.trading_calendar,
+            self.restrictions_controller
         )
         self.assertEqual(
             liquid_day_1_price,
@@ -1019,7 +1084,8 @@ class TestDailyBarData(WithBarDataChecks,
             self.data_portal,
             lambda: self.equity_daily_bar_days[1],
             "daily",
-            self.trading_calendar
+            self.trading_calendar,
+            self.restrictions_controller
         )
         self.assertEqual(
             illiquid_day_0_price, bar_data.current(illiquid_asset, "price")
@@ -1029,7 +1095,8 @@ class TestDailyBarData(WithBarDataChecks,
             self.data_portal,
             lambda: self.equity_daily_bar_days[2],
             "daily",
-            self.trading_calendar
+            self.trading_calendar,
+            self.restrictions_controller
         )
 
         # 3 (price from previous day) * 0.5 (split ratio)
@@ -1037,3 +1104,31 @@ class TestDailyBarData(WithBarDataChecks,
             illiquid_day_1_price_adjusted,
             bar_data.current(illiquid_asset, "price")
         )
+
+    def test_can_trade_restricted(self):
+        """
+        Test that can_trade will return False for a sid if it is restricted
+        on that dt
+        """
+
+        minutes_to_check = [
+            (pd.Timestamp("2016-01-05", tz="UTC"), False),
+            (pd.Timestamp("2016-01-06", tz="UTC"), False),
+            (pd.Timestamp("2016-01-07", tz="UTC"), True),
+        ]
+
+        rlm = InMemoryRLManager([
+            Restriction(1, str_to_ts('2016-01-05'), str_to_ts('2016-01-06'),
+                        'freeze'),
+            Restriction(1, str_to_ts('2016-01-06'), str_to_ts('2016-01-07'),
+                        'liquidate'),
+        ])
+        self.restrictions_controller.add_restrictions(rlm)
+
+        for info in minutes_to_check:
+            bar_data = BarData(self.data_portal,
+                               lambda: info[0],
+                               "daily",
+                               self.trading_calendar,
+                               self.restrictions_controller)
+            self.assertEqual(bar_data.can_trade(self.ASSET1), info[1])

@@ -32,6 +32,7 @@ from zipline.finance.blotter import Blotter
 from zipline.finance.execution import MarketOrder, LimitOrder
 from zipline.finance.performance import PerformanceTracker
 from zipline.finance.trading import SimulationParameters
+from zipline.rl_manager import RestrictionsController
 from zipline.data.us_equity_pricing import BcolzDailyBarReader
 from zipline.data.minute_bars import BcolzMinuteBarReader
 from zipline.data.data_portal import DataPortal
@@ -320,7 +321,8 @@ class FinanceTestCase(WithLogger,
                         data_portal,
                         lambda: tick,
                         sim_params.data_frequency,
-                        self.trading_calendar
+                        self.trading_calendar,
+                        RestrictionsController()
                     )
                     txns, _, closed_orders = blotter.get_transactions(bar_data)
                     for txn in txns:

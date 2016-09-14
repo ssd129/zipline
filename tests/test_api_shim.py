@@ -6,6 +6,7 @@ import pandas as pd
 from pandas.io.common import PerformanceWarning
 
 from zipline import TradingAlgorithm
+from zipline.rl_manager import RestrictionsController
 from zipline.finance.trading import SimulationParameters
 from zipline.protocol import BarData
 from zipline.testing import (
@@ -190,7 +191,8 @@ class TestAPIShim(WithDataPortal, WithSimParams, ZiplineTestCase):
             self.data_portal,
             lambda: test_end_minute,
             "minute",
-            self.trading_calendar
+            self.trading_calendar,
+            RestrictionsController()
         )
         ohlcvp_fields = [
             "open",

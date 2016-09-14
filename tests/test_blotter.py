@@ -26,6 +26,7 @@ from zipline.finance.execution import (
 )
 
 from zipline.gens.sim_engine import SESSION_END, BAR
+from zipline.rl_manager import RestrictionsController
 from zipline.finance.cancel_policy import EODCancel, NeverCancel
 from zipline.finance.slippage import (
     DEFAULT_VOLUME_SLIPPAGE_BAR_LIMIT,
@@ -223,7 +224,8 @@ class BlotterTestCase(WithLogger,
             self.data_portal,
             lambda: self.sim_params.sessions[-1],
             self.sim_params.data_frequency,
-            self.trading_calendar
+            self.trading_calendar,
+            RestrictionsController()
         )
         txns, _, closed_orders = blotter.get_transactions(bar_data)
         for txn in txns:
@@ -299,7 +301,8 @@ class BlotterTestCase(WithLogger,
                 self.data_portal,
                 lambda: dt,
                 self.sim_params.data_frequency,
-                self.trading_calendar
+                self.trading_calendar,
+                RestrictionsController()
             )
             txns, _, _ = blotter.get_transactions(bar_data)
             for txn in txns:

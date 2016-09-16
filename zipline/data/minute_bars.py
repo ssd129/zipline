@@ -13,6 +13,8 @@
 # limitations under the License.
 import json
 import os
+import re
+from glob import glob
 from os.path import join
 from textwrap import dedent
 
@@ -818,6 +820,18 @@ class BcolzMinuteBarReader(MinuteBarReader):
     @property
     def first_trading_day(self):
         return self._start_session
+
+    def sids(self):
+        """
+        Returns
+        -------
+        list
+            The sids for which there is a bcolz file.
+        """
+        glob_path = os.path.join(self._rootdir, "*", "*", "*.bcolz")
+        bcolz_paths = glob(glob_path)
+        matches = (re.search('(\d+).bcolz', path) for path in bcolz_paths)
+        return [int(match.group(1)) for match in matches]
 
     def _ohlc_ratio_inverse_for_sid(self, sid):
         if self._ohlc_inverses_per_sid is not None:

@@ -943,3 +943,20 @@ class BcolzMinuteBarTestCase(WithTradingCalendars,
         # Read the attributes
         for k, v in attrs.items():
             self.assertEqual(self.reader.get_sid_attr(sid, k), v)
+
+    def test_sids(self):
+        minute = self.market_opens[self.test_calendar_start]
+        sids = [1, 1000000001]
+        for sid in sids:
+            data = DataFrame(
+                data={
+                    'open': [10.0],
+                    'high': [20.0],
+                    'low': [30.0],
+                    'close': [40.0],
+                    'volume': [50.0]
+                },
+                index=[minute])
+            self.writer.write_sid(sid, data)
+
+        self.assertEqual(self.reader.sids(), sids)
